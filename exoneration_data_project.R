@@ -1,20 +1,54 @@
 library(plotly)
 library(dplyr)
 
-df2 = read.csv("NRE_data.csv") # load in National Register of Exonerations data
+df = read.csv("NRE_data.csv") # load in National Register of Exonerations data
 
-unique(df2$State)
+unique(df$State)
+
+# add a ones colums, add them to get # of exonerations
+
+df$exoneration = 1 # this is maybe not the most straightforward way to get count data,
+# but it's simple and it works
 
 # get state count:
 
-state.count <- df2 %>%
+state.count <- df %>%
   group_by(State) %>%
   summarise(
     exoneration_sum = sum(exoneration)
     )
 
-iris_data = iris
+# for the moment I'm removing exonerations labelled by "Fed" (86 total) as opposed to just 
+# a state designation; I'll want to add these values back into the normal state 
+# counts at some point; assuming these are federal vs. state level convictions; 
+# in addition I'm also not looking at PR (3), Guam (1), and DC (15), all of which are 
+# included in the dataset
 
+state.count.Fed_only = filter(state.count, grepl("Fed", State))
+state.count.PR_only = filter(state.count, grepl("Puerto Rico", State))
+state.count.Guam_only = filter(state.count, grepl("Guam", State))
+state.count.DC_only = filter(state.count, grepl("District of Columbia", State))
+
+sum(state.count.Fed_only$exoneration_sum) # 86 federal exonerations
+sum(state.count.PR_only$exoneration_sum) # 3 PR exonerations
+sum(state.count.Guam_only$exoneration_sum) # 1 Guam exonaeration
+sum(state.count.DC_only$exoneration_sum) # 15
+sum(state.count.Fed_removed$exoneration_sum) # 1595 total exonerations in fed/territory 
+# removed dataset
+sum(state.count$exoneration_sum) # 1700 total exonerations including fed/territory
+
+state.count.Fed_removed = filter(state.count, !grepl("Fed", State))
+state.count.Fed_removed = filter(state.count.Fed_removed, !grepl("Puerto Rico", State))
+state.count.Fed_removed = filter(state.count.Fed_removed, !grepl("Guam", State))
+state.count.Fed_removed = filter(state.count.Fed_removed, !grepl("District of Columbia", State))
+
+# add state code; apparently plotly likes to use state abbreviations; here we add them
+# from the agriculture example
+
+state.count.Fed_removed$code = df_agr$code 
+
+# iris dataset for example
+iris_data = iris
 
 sub.mn <- iris_data %>%
   group_by(Species) %>%
@@ -22,9 +56,6 @@ sub.mn <- iris_data %>%
     sum_petal_width = sum(Petal.Width),
     mean_petal_length = mean(Petal.Length))
 
-iris_data2 = iris 
-
-num_colors = 5
 
 # basic plot of exoneration numbers by state:
 # issues: excludes Guam, Puerto Rico, and D.C.; doesn't have handy lables for small east 
@@ -63,22 +94,10 @@ plotly_POST(p, filename = "r-docs/exoneration_plot", world_readable=TRUE)
 dplyr::slice(iris, 10:15)
 
 
-state.count.Fed_removed = filter(state.count, !grepl("Fed", State))
-state.count.Fed_removed = filter(state.count.Fed_removed, !grepl("Puerto Rico", State))
-state.count.Fed_removed = filter(state.count.Fed_removed, !grepl("Guam", State))
-state.count.Fed_removed = filter(state.count.Fed_removed, !grepl("District of Columbia", State))
-
-# add state code?
-
-state.count.Fed_removed$code = df$code # this helped
 
 
 state.count.Fed_removed[is.na(state.count.Fed_removed)] <- 0 # remove "NA"s, maybe that'll fix things?; did not fix things
 
-# add a ones colums, add them to get # of exonerations
-
-
-df2$exoneration = 1
 
 plot_ly(state.count.Fed_removed, z = age_sum, locations = State, type = 'choropleth',
         locationmode = 'USA-states', color = num_colors, colors = 'Blues',
@@ -87,10 +106,26 @@ plot_ly(state.count.Fed_removed, z = age_sum, locations = State, type = 'choropl
   layout(title = '2011 US Agriculture Exports by State<br>(Hover for breakdown)', geo = g)
 
 
-alaska_exonerations = filter(df2, State == 'Alaska')
+alaska_exonerations = filter(df, State == 'Alaska')
 
-wisconsin_exonerations = filter(df2, State == 'Wisconsin')
+wisconsin_exonerations = filter(df, State == 'Wisconsin')
 
-pennsylvania_exonerations = filter(df2, State == 'Pennsylvania')
+pennsylvania_exonerations = filter(df, State == 'Pennsylvania')
+
+## import state population data; median 2002 ()
+
+pop_data = read.csv("annual_pop_est_2000_2002.csv")
+
+pop_data2 = dplyr::slice(pop_data, 4:54)
+
+colnames(pop_data2)
+
+pop_data2 = filter(pop_data2, !grepl("District of Columbia", table.with.row.headers.in.column.A.and.column.headers.in.row.3)) # remove DC
+
+
+state.count.Fed_removed$pop = pop_data2$X # add 2002 population data
+
+
+
 
 
