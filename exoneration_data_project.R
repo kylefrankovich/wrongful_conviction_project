@@ -1,6 +1,13 @@
 library(plotly)
 library(dplyr)
 
+setwd("~/Google Drive/wrongful_conviction_project")
+
+# set plotly account parameters:
+
+Sys.setenv("plotly_username"="kyle.frankovich")
+Sys.setenv("plotly_api_key"="r5kz3hc8a1")
+
 df = read.csv("NRE_data.csv") # load in National Register of Exonerations data
 
 unique(df$State)
@@ -42,10 +49,10 @@ state.count.Fed_removed = filter(state.count.Fed_removed, !grepl("Puerto Rico", 
 state.count.Fed_removed = filter(state.count.Fed_removed, !grepl("Guam", State))
 state.count.Fed_removed = filter(state.count.Fed_removed, !grepl("District of Columbia", State))
 
-# add state code; apparently plotly likes to use state abbreviations; here we add them
-# from the agriculture example
+# add state code; apparently plotly likes to use state abbreviations; use state.abb function:
 
-state.count.Fed_removed$code = df_agr$code 
+state.count.Fed_removed$code = state.abb[match(state.count.Fed_removed$State,state.name)]
+
 
 # iris dataset for example
 iris_data = iris
@@ -71,6 +78,17 @@ sub.mn <- iris_data %>%
 # other ideas to control for population/conviction population? need to see if we can identify outliers
 # (states with relatively high number of exonerations (or investigations) regardless of population)
 
+# give state boundaries a white border
+l <- list(color = toRGB("white"), width = 2)
+
+# specify some map projection/options
+g <- list(
+  scope = 'usa',
+  projection = list(type = 'albers usa'),
+  showlakes = TRUE,
+  lakecolor = toRGB('white')
+)
+
 plot_ly(state.count.Fed_removed, z = exoneration_sum, locations = code, type = 'choropleth',
         locationmode = 'USA-states', color = exoneration_sum, colors = 'Reds',
         marker = list(line = l), colorbar = list(title = "Total Exonerations"),
@@ -86,24 +104,9 @@ p = plot_ly(state.count.Fed_removed, z = exoneration_sum, locations = code, type
 
 # save and publish
 
-p <- plot_ly(midwest, x = percollege, color = state, type = "box")
 plotly_POST(p, filename = "r-docs/exoneration_plot", world_readable=TRUE)
 
-?plot_ly
-
 dplyr::slice(iris, 10:15)
-
-
-
-
-state.count.Fed_removed[is.na(state.count.Fed_removed)] <- 0 # remove "NA"s, maybe that'll fix things?; did not fix things
-
-
-plot_ly(state.count.Fed_removed, z = age_sum, locations = State, type = 'choropleth',
-        locationmode = 'USA-states', color = num_colors, colors = 'Blues',
-        marker = list(line = l), colorbar = list(title = "Millions USD"),
-        filename="r-docs/usa-choropleth") %>%
-  layout(title = '2011 US Agriculture Exports by State<br>(Hover for breakdown)', geo = g)
 
 
 alaska_exonerations = filter(df, State == 'Alaska')
@@ -114,18 +117,100 @@ pennsylvania_exonerations = filter(df, State == 'Pennsylvania')
 
 ## import state population data; median 2002 ()
 
-pop_data = read.csv("annual_pop_est_2000_2002.csv")
+pop_data = read.csv("annual_pop_est_2000_2002.csv", stringsAsFactors = FALSE, header = FALSE)
 
-pop_data2 = dplyr::slice(pop_data, 4:54)
+pop_data2 = dplyr::slice(pop_data, 5:55) # select rows with actual state pop data
 
-colnames(pop_data2)
+pop_data2 = filter(pop_data2, !grepl("District of Columbia", V1)) # remove DC
 
-pop_data2 = filter(pop_data2, !grepl("District of Columbia", table.with.row.headers.in.column.A.and.column.headers.in.row.3)) # remove DC
+# as.numeric(gsub(",","", pop_data2$V2)) # this gets around the data containing commas which
+# resulted in NAs being induced by coercion 
+
+state.count.Fed_removed$pop = as.numeric(gsub(",","", pop_data2$V2)) # add 2002 population data
+
+head(state.count.Fed_removed)
+
+# lets take a look at basic correlation b/w exonerations and 2002 population
+
+xvar = state.count.Fed_removed$exoneration_sum
+
+yvar = state.count.Fed_removed$pop
+
+# yvar = as.numeric(state.count.Fed_removed$pop) # this actually gives level codes, not numbers
+
+ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
+  geom_point(shape=1)      # Use hollow circles
+
+ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
+  geom_point(shape=1) +    # Use hollow circles
+  geom_smooth(method=lm)   # Add linear regression line 
+#  (by default includes 95% confidence region)
+
+ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
+  geom_point(shape=1) +    # Use hollow circles
+  geom_smooth(method=lm,   # Add linear regression line
+              se=FALSE)    # Don't add shaded confidence region
 
 
-state.count.Fed_removed$pop = pop_data2$X # add 2002 population data
+ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
+  geom_point(shape=1) +    # Use hollow circles
+  geom_smooth()            # Add a loess smoothed fit curve with confidence region
+#> geom_smooth: method="auto" and size of largest group is <1000, so using loess. Use 'method = x' to change the smoothing method.
 
 
+ggplot(state.count.Fed_removed, aes(x = xvar,y = yvar))+stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method='lm')
+
+plot_ly(data = iris, x = Sepal.Length, y = Petal.Length, mode = "markers")
+
+p = plot_ly(data = state.count.Fed_removed, x = exoneration_sum, y = pop, text = State, mode = "markers")
+
+plotly_POST(p, filename = "r-docs/exoneration_scatterplot", world_readable=TRUE)
+
+
+
+p %>% add_trace(y = fitted(loess(as.numeric(pop) ~ exoneration_sum)))
+
+
+ggplotly_example = ggplot(state.count.Fed_removed, aes(x=state.count.Fed_removed$exoneration_sum, y=state.count.Fed_removed$pop)) +
+  geom_point(shape=1) +    # Use hollow circles
+  geom_smooth(method=lm,   # Add linear regression line
+              se=FALSE)    # Don't add shaded confidence region
+
+
+#### ggplotly example ####
+
+p <- ggplot(data = d, aes(x = carat, y = price)) +
+  geom_point(aes(text = paste("Clarity:", clarity)), size = 4) +
+  geom_smooth(aes(colour = cut, fill = cut)) + facet_wrap(~ cut)
+
+
+
+(gg <- ggplotly(ggplotly_example))
+
+## breakdown by race:
+
+
+# get exoneration count by race:
+
+race.count <- df %>%
+  group_by(Race) %>%
+  summarise(
+    exoneration_sum_race = sum(exoneration)
+  )
+
+sum(race.count$exoneration_sum_race)
+
+race.count()
+
+p_bar <- plot_ly(
+  x = c("giraffes", "orangutans", "monkeys"),
+  y = c(20, 14, 23),
+  name = "SF Zoo",
+  type = "bar",
+  filename="r-docs/simple-bar"
+)
+p
 
 
 
