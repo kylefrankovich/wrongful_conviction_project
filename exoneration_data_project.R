@@ -138,13 +138,13 @@ yvar = state.count.Fed_removed$pop
 
 # yvar = as.numeric(state.count.Fed_removed$pop) # this actually gives level codes, not numbers
 
-ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
-  geom_point(shape=1)      # Use hollow circles
-
-ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
-  geom_point(shape=1) +    # Use hollow circles
-  geom_smooth(method=lm)   # Add linear regression line 
-#  (by default includes 95% confidence region)
+# ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
+#   geom_point(shape=1)      # Use hollow circles
+# 
+# ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
+#   geom_point(shape=1) +    # Use hollow circles
+#   geom_smooth(method=lm)   # Add linear regression line 
+# #  (by default includes 95% confidence region)
 
 ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
   geom_point(shape=1) +    # Use hollow circles
@@ -152,16 +152,15 @@ ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
               se=FALSE)    # Don't add shaded confidence region
 
 
-ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
-  geom_point(shape=1) +    # Use hollow circles
-  geom_smooth()            # Add a loess smoothed fit curve with confidence region
-#> geom_smooth: method="auto" and size of largest group is <1000, so using loess. Use 'method = x' to change the smoothing method.
+# ggplot(state.count.Fed_removed, aes(x=xvar, y=yvar)) +
+#   geom_point(shape=1) +    # Use hollow circles
+#   geom_smooth()            # Add a loess smoothed fit curve with confidence region
+# #> geom_smooth: method="auto" and size of largest group is <1000, so using loess. Use 'method = x' to change the smoothing method.
 
-
-ggplot(state.count.Fed_removed, aes(x = xvar,y = yvar))+stat_summary(fun.data=mean_cl_normal) + 
-  geom_smooth(method='lm')
 
 plot_ly(data = iris, x = Sepal.Length, y = Petal.Length, mode = "markers")
+
+# plotly scatterplot (still need to find a way to add regression line?)
 
 p = plot_ly(data = state.count.Fed_removed, x = exoneration_sum, y = pop, text = State, mode = "markers")
 
@@ -199,9 +198,46 @@ race.count <- df %>%
     exoneration_sum_race = sum(exoneration)
   )
 
+head(iris)
+height(iris)
+count(iris, Species)
+
 sum(race.count$exoneration_sum_race)
 
+race.count_no_blank = dplyr::slice(race.count, 2:7)
+
+
+
+# there's one blank value for race, let's find it:
+
+names = c("tom", "lynn", 'steve', 'joey', 'ross', 'chandler')
+
+s = c('names')
+
+dat = data.frame(names)
+
+target = c('ross', 'chandler', 'joey')
+
+filter(dat, names %in% target)  # equivalently, dat %>% filter(name %in% target)
+
+unique_race = unique(df$Race)
+
+length(unique_race)
+
+race.count.blank = filter(race.count, !grepl("Fed", State))
+
+
 race.count()
+
+# there is 1 exoneration w/o race label (Alvin Jardine; Hawaii):
+
+race_blank = filter(df, Race != 'Black')
+race_blank = filter(race_blank, Race != 'Asian')
+race_blank = filter(race_blank, Race != 'Caucasian')
+race_blank = filter(race_blank, Race != 'Hispanic')
+race_blank = filter(race_blank, Race != 'Native American')
+race_blank = filter(race_blank, Race != 'Other')
+
 
 p_bar <- plot_ly(
   x = c("giraffes", "orangutans", "monkeys"),
@@ -210,7 +246,86 @@ p_bar <- plot_ly(
   type = "bar",
   filename="r-docs/simple-bar"
 )
-p
+p_bar
+
+
+race_plot <- plot_ly(
+  x = race.count_no_blank$Race,
+  y = race.count_no_blank$exoneration_sum_race,
+  name = "Exonerations by Race",
+  type = "bar",
+  filename="r-docs/simple-bar-exonerations-by-race"
+)
+
+race_plot
+
+
+# let's try to look at state level of total prison population by year/race:
+
+# data from: http://www.icpsr.umich.edu/icpsrweb/NACJD/studies/35608?searchSource=revise&q=National+Prisoner+Statistics
+
+prison_pop_data = read.csv('all_ 4_pop_counts_1980_2013.csv') # doesn't include state or race variables...
+
+
+
+# exonerations by year:
+
+# get exoneration count by year:
+
+year.count <- df %>%
+  group_by(Exonerated) %>%
+  summarise(
+    exoneration_sum_year = sum(exoneration)
+  )
+
+# ggplot of exonerations by year: 
+
+ggplot(data=year.count, aes(x=Exonerated, y=exoneration_sum_year)) +
+  geom_line() +
+  geom_point()
+
+# plotly version:
+
+plot_ly(data = year.count, x = Exonerated, y = exoneration_sum_year, name = "exonerations by year")
+
+
+# let's get number of exonerations with DNA evidence:
+
+# get exoneration count by year:
+
+dna.count <- df %>%
+  group_by(DNA) %>%
+  summarise(
+    exoneration_sum_dna = sum(exoneration)
+  )
+
+# create dna exoneration subset:
+
+dna.data = filter(df, DNA == 'DNA')
+
+dna.year.count <- dna.data %>%
+  group_by(Exonerated) %>%
+  summarise(
+    exoneration_sum_year_dna = sum(exoneration)
+  )
+
+
+# first DNA exoneration:
+
+min(dna.data$Exonerated) # first one in 1989
+
+# plotly DNA conviction data by year:
+
+x <- list(
+  title = "DNA exonerations by year"
+)
+
+plot_ly(data = dna.year.count, x = Exonerated, y = exoneration_sum_year_dna, name = "exonerations by year (DNA)") %>%
+  layout(xaxis = x)
+
+
+
+
 
 
 
